@@ -93,3 +93,4 @@ Please be aware that because community plugins are developed by the QIIME 2 deve
 More information on development and support for community plugins can be found [here](https://library.qiime2.org).
 If you need help with a community plugin, first refer to the [project website](https://steph0522.github.io/website/).
 If that page doesn't provide information on how to get help, or you need additional help, head to the [Community Plugins category](https://forum.qiime2.org/c/community-contributions/community-plugins/14) on the QIIME 2 Forum where the QIIME 2 developers will do their best to help you.
+#q2-hill a Repo to calculate hill numbers within QIIME2
