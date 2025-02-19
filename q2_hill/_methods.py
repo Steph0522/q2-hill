@@ -27,7 +27,7 @@ def alpha_taxa(table: pd.DataFrame, q: float) -> pd.Series:
         hill_numbers = (prop**q).sum(axis=1) ** (1 / (1 - q))  # General formula
 
     # Return as serie
-    return pd.Series(hill_numbers, index=table.index, name=f"q={q}")
+    return pd.Series(hill_numbers, index=table.index, name=f"TD q={q}")
 
 
 # Functions for data prep phylo
