@@ -171,5 +171,5 @@ def alpha_phylo(table: pd.DataFrame, phylogeny: TreeNode, q: float) -> pd.Series
         else:
             PD[sample] = np.sum(plength[I] * (pabun_sample[I] / TT) ** q) ** (1 / (1 - q))
 
-    return pd.Series(PD, name="PD")
+    return pd.Series(PD, name=f"PD q={q}")
 
