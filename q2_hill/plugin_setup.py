@@ -4,19 +4,13 @@
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
-# ----------------------------------------------------------------------------# ----------------------------------------------------------------------------
-# Copyright (c) 2024, Stephanie Hereira-Pacheco.
-#
-# Distributed under the terms of the Modified BSD License.
-#
-# The full license is in the file LICENSE, distributed with this software.
-# ----------------------------------------------------------------------------
-
-from qiime2.plugin import Plugin, Float
+# ----------------------------------------------------------------------------# 
+from qiime2.plugin import Plugin, Float, Metadata
 from q2_types.feature_table import FeatureTable, Frequency
+from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
 import pandas as pd
-from q2_hill._methods import alpha_taxa
+from q2_hill._methods import alpha_taxa, alpha_phylo
 
 plugin = Plugin(
     name="hill",
@@ -38,3 +32,28 @@ plugin.methods.register_function(
     output_descriptions={"alpha_diversity": "Hill numbers calculated for the order indicated"},
 )
 
+plugin.methods.register_function(
+    function=alpha_phylo,
+    inputs={
+        "table": FeatureTable[Frequency],
+        "phylogeny": Phylogeny[Rooted],
+    },
+    parameters={
+        "q": Float
+    },
+    outputs=[
+        ("alpha_diversity", SampleData[AlphaDiversity])
+    ],
+    input_descriptions={
+        "table": "Feature table with species abundances.",
+        "phylogeny": "Rooted phylogenetic tree corresponding to species in the table."
+    },
+    parameter_descriptions={
+        "q": "Order of Hill number (q ≥ 0)."
+    },
+    output_descriptions={
+        "alpha_diversity": "Alpha diversity values per sample."
+    },
+    name="Phylogenetic Hill Diversity",
+    description="Computes phylogenetic diversity using Hill numbers with a given order q."
+)
