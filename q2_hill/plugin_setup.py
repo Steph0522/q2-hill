@@ -5,12 +5,13 @@
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------# 
-from qiime2.plugin import Plugin, Float, Metadata
+from qiime2.plugin import Plugin, Float, Metadata, Choices, Str
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
 import pandas as pd
 from q2_hill._methods import alpha_taxa, alpha_phylo
+
 
 plugin = Plugin(
     name="hill",
@@ -39,7 +40,8 @@ plugin.methods.register_function(
         "phylogeny": Phylogeny[Rooted],
     },
     parameters={
-        "q": Float
+        "q": Float,
+        "metric": Str % Choices(["PD", "qDT"])
     },
     outputs=[
         ("alpha_diversity", SampleData[AlphaDiversity])
@@ -49,7 +51,9 @@ plugin.methods.register_function(
         "phylogeny": "Rooted phylogenetic tree corresponding to species in the table."
     },
     parameter_descriptions={
-        "q": "Order of Hill number (q ≥ 0)."
+        "q": "Order of Hill number (q ≥ 0).",
+        'metric': "Metric to calculate: 'PD' for hillR o 'qDT' para hilldiv2. Default PD."
+
     },
     output_descriptions={
         "alpha_diversity": "Alpha diversity values per sample."
