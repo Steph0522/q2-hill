@@ -1,16 +1,12 @@
-# ----------------------------------------------------------------------------
-# Copyright (c) 2024, Stephanie Hereira-Pacheco.
-#
-# Distributed under the terms of the Modified BSD License.
-#
-# The full license is in the file LICENSE, distributed with this software.
-# ----------------------------------------------------------------------------# 
-from qiime2.plugin import Plugin, Float, Metadata, Choices, Str
+from qiime2.plugin import (Plugin, Str, Properties, Choices, Int, Bool, Range,
+                           Float, Set, Visualization, Metadata, MetadataColumn,
+                           Categorical, Numeric, Citations, Threads)
+from typing import Union
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
-import pandas as pd
-from q2_hill._methods import alpha_taxa, alpha_phylo
+from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional, compute_distance
+from q2_types.distance_matrix import DistanceMatrix
 
 
 plugin = Plugin(
@@ -43,9 +39,7 @@ plugin.methods.register_function(
         "q": Float,
         "metric": Str % Choices(["PD", "qDT"])
     },
-    outputs=[
-        ("alpha_diversity", SampleData[AlphaDiversity])
-    ],
+    outputs=[("alpha_diversity", SampleData[AlphaDiversity])],
     input_descriptions={
         "table": "Feature table with species abundances.",
         "phylogeny": "Rooted phylogenetic tree corresponding to species in the table."
@@ -53,7 +47,6 @@ plugin.methods.register_function(
     parameter_descriptions={
         "q": "Order of Hill number (q ≥ 0).",
         'metric': "Metric to calculate: 'PD' for hillR o 'qDT' para hilldiv2. Default PD."
-
     },
     output_descriptions={
         "alpha_diversity": "Alpha diversity values per sample."
@@ -61,3 +54,34 @@ plugin.methods.register_function(
     name="Phylogenetic Hill Diversity",
     description="Computes phylogenetic diversity using Hill numbers with a given order q."
 )
+
+plugin.methods.register_function(
+    function=alpha_functional,
+    inputs={
+        "table": FeatureTable[Frequency]
+    },
+    parameters={
+        "traits": Metadata,
+        "q": Float,
+        "dist": Str % Choices(["euclidean", "manhattan", "gower"]),
+        "metric": Str % Choices(["FD", "FD_q", "D_q", "Q", "MD_q", "FDis"]),
+        "tau": Float % Range(0, 1e10) | Str % Choices(["min", "max", "mean"])
+    },
+    outputs=[("diversity", SampleData[AlphaDiversity])],
+    input_descriptions={
+        "table": "Feature table with species abundances."
+    },
+    parameter_descriptions={
+        "traits": "Metadata containing trait data with species as rows and trait variables as columns.",
+        "q": "Order of Hill number (q ≥ 0).",
+        "dist": "Distance metric to compute: 'euclidean', 'manhattan' or 'gower'.",
+        "metric": "Metric to calculate: 'FD' for hilldiv2, or 'FD_q', 'D_q', 'Q', 'MD_q' or 'FDis' for hillR.",
+        "tau": "Threshold for distances. Can be a positive number or None if no threshold is applied."
+    },
+    output_descriptions={
+        "diversity": "Alpha diversity values per sample."
+    },
+    name="Functional Hill Diversity",
+    description="Computes functional diversity (Hill numbers) using a feature table and traits metadata."
+)
+

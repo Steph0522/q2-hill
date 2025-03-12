@@ -1,5 +1,5 @@
-# ---------------------------------------------------------------------------- Copyright (c) 2024, Stephanie 
-# Hereira-Pacheco.
+# ----------------------------------------------------------------------------
+# Copyright (c) 2024, Stephanie Hereira-Pacheco.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -9,6 +9,12 @@
 import numpy as np
 from skbio import TreeNode
 import pandas as pd
+import skbio
+from skbio import DistanceMatrix
+from skbio.diversity import beta_diversity
+from qiime2 import Metadata
+
+
 
 def alpha_taxa(table: pd.DataFrame, q: float) -> pd.Series:
     # check if is a df
@@ -105,7 +111,7 @@ def dat_prep_phylo(comm, phylogeny):
     n_cols = phylogeny.count() - 1
     n_rows = comm.shape[1]
     node_names = [node.name for node in phylogeny.traverse()][1:]
-    M2 = pd.DataFrame(0, index=comm.columns, columns=node_names)  
+    M2 = pd.DataFrame(0, index=comm.columns, columns=node_names)
 
     tips_names = [tip.name for tip in phylogeny.tips()]
     for i in range(len(M2.columns) - 1, -1, -1):
@@ -197,31 +203,29 @@ def alpha_phylo_hilldiv2(matrix: pd.DataFrame, phylogeny: TreeNode, q: float) ->
     ltips_idx = [[matrix.index.get_loc(name) for name in group] for group in ltips]
 
     # ai.multi calculation
-    # Aplicar la función tss y luego calcular 'ai.multi'
+    # Aply tss y then 'ai.multi'
     ai_multi = np.array([
      [np.sum(tss(matrix.iloc[:, j]).iloc[ltips_idx_i]) for ltips_idx_i in ltips_idx]
         for j in range(matrix.shape[1])
     ]).T
 
-    # Crear un DataFrame con los resultados
+    # df results
     ai_multi_df = pd.DataFrame(ai_multi, columns=matrix.columns, index=[f"tip_group_{i+1}" for i in range(len(ltips))])
     ai = ai_multi_df
 
-    # Calculate reference T for an even distribution of all present MAGs
+    # loop
     pool = pd.DataFrame(matrix).apply(lambda row: 1 if any(row != 0) else 0, axis=1).values
     pool_dict = dict(zip(matrix.index, pool))
 
     #ai.all
-    # Normalizamos pool_dict
+    # Normalization
     normalized_pool_dict = tss2(pool_dict)
-    # Asegúrate de que las especies en ltips estén en el diccionario normalized_pool_dict
     for TipVector in ltips:
         for tip in TipVector:
             if tip not in normalized_pool_dict:
-                print(f"Error: '{tip}' no está en el diccionario normalized_pool_dict")
+                print(f"Error: '{tip}' is not in normalized_pool_dict")
 
 
-    # Calcula ai.all para cada conjunto de especies en ltips
     ai_all = [sum(normalized_pool_dict[tip] for tip in TipVector) for TipVector in ltips] 
     T = np.sum(Li * ai_all)
 
@@ -229,7 +233,7 @@ def alpha_phylo_hilldiv2(matrix: pd.DataFrame, phylogeny: TreeNode, q: float) ->
     present = np.sum(matrix != 0, axis=0)
 
 
- # Calcular valores de Hill con un solo if-else
+ # Calculate Hill values
     results = np.zeros(ai_multi.shape[1])
 
     for i in range(ai_multi.shape[1]):
@@ -257,4 +261,342 @@ def alpha_phylo(table: pd.DataFrame, phylogeny: TreeNode, q: float, metric: str 
     else:
         raise ValueError("Invalid metric. Use 'PD' or 'qDT'.")
 
+
+def compute_distance(traits: Metadata, dist: str = "euclidean") -> DistanceMatrix:
+    
+    traits_df = traits.to_dataframe()
+
+    if dist in ["euclidean", "manhattan"]:
+        dist_matrix = beta_diversity(dist, traits_df.values, ids=traits_df.index)
+
+    elif dist == "gower":
+        # Manual Gower distance
+        def gower_distance(data):
+            def normalize_column(col):
+                return (col - col.min()) / (col.max() - col.min())
+
+            data_normalized = data.copy()
+            for col in data.columns:
+                if data[col].dtype != "object":
+                    data_normalized[col] = normalize_column(data[col])
+
+            n_species = len(data)
+            n_features = len(data.columns)
+            dist_matrix = np.zeros((n_species, n_species))
+
+            for i in range(n_species):
+                for j in range(i + 1, n_species):
+                    total_distance = 0
+                    for k in range(n_features):
+                        if data.iloc[:, k].dtype != "object":
+                            distance = abs(data_normalized.iloc[i, k] - data_normalized.iloc[j, k])
+                        else:
+                            distance = 0 if data.iloc[i, k] == data.iloc[j, k] else 1
+                        total_distance += distance
+                    dist_matrix[i, j] = dist_matrix[j, i] = total_distance / n_features
+
+            return dist_matrix
+
+        gower_matrix = gower_distance(traits)
+        dist_matrix = DistanceMatrix(gower_matrix, ids=traits.index)
+
+    else:
+        raise ValueError("Parameter --p-dist must be 'euclidean', 'manhattan' or 'gower'.")
+
+    return dist_matrix
+
+def compute_tau(dist_matrix: skbio.DistanceMatrix, tau: str or float = "mean") -> float:
+    
+    if isinstance(tau, (int, float)) and tau > 0:
+        return tau  # If it is a number return this 
+
+    n = dist_matrix.shape[0]
+    lower_values = dist_matrix.data[np.tril_indices(n, k=-1)]  #extract lower values
+    nonzero_lower_values = lower_values[lower_values != 0]  # exclude zeros
+
+    if len(nonzero_lower_values) == 0:
+        raise ValueError("Values are zero")
+
+    if tau == "min":
+        return np.min(nonzero_lower_values)
+    elif tau == "max":
+        return np.max(nonzero_lower_values)
+    elif tau == "mean":
+        return np.mean(nonzero_lower_values)
+    else:
+        raise ValueError("Parameter tau must be a number > 0 or 'min', 'max' o 'mean'.")
+
+def alpha_functional_hilldiv2(table: pd.DataFrame, traits: skbio.DistanceMatrix, q_value, tau: str or float = "mean")-> pd.Series:
+    # check common species between table and distance matrix
+    table = table.copy().T
+    common_species = table.index.intersection(traits.ids)
+    if common_species.empty:
+        raise ValueError("Species of table and traits do not match")
+    
+    # Determinate tau
+    tau = compute_tau(traits, tau) if not (isinstance(tau, (int, float)) and tau > 0) else tau
+    
+    # Extract distance matriz and limitate to tau
+    dij = traits.filter(common_species, strict=False).data  
+    dij = np.where(dij > tau, tau, dij)
+    
+    # Normalization
+    comm_norm = table.div(table.sum(axis=0), axis=1).fillna(0).values
+    species_names = table.index
+    sample_names = table.columns.tolist()
+    comm_norm = pd.DataFrame(comm_norm, index=species_names, columns=sample_names)
+    
+    a_multi = np.dot(1 - dij / tau, comm_norm)
+    a_multi[a_multi < 0] = 0
+    valid_rows = np.sum(a_multi, axis=1) != 0
+    a_multi = a_multi[valid_rows, :]
+    comm_norm = comm_norm.iloc[valid_rows, :]
+    
+    if a_multi.shape[0] == 0 or a_multi.shape[1] == 0:
+        raise ValueError("All rows were removed after a-multi filter")
+    
+    v_multi = comm_norm / (a_multi + 1e-10)
+    
+    # results as a dictionary
+    results = {}
+    for j, sample in enumerate(v_multi.columns):
+        v_col = v_multi[sample].values
+        a_col = a_multi[:, j]
+        mask = ~np.isnan(a_col)
+        v_filtered = v_col[mask]
+        a_filtered = a_col[mask]
+        
+        if q_value == 1:
+            # For q=1: 
+            entropy = np.sum(-v_filtered * a_filtered * np.log(a_filtered + 1e-10))
+            results[sample] = np.exp(entropy)
+        else:
+            # For anything different to 1
+            results[sample] = (np.sum(v_filtered * a_filtered**q_value))**(1 / (1 - q_value))
+    
+    # Convert results to series
+    results_series = pd.Series(results, name=f"qDT q={q_value}")
+    return results_series
+
+def fdisp(dij, a, tol=1e-07):
+    n = dij.shape[0]  # número de especies
+
+    # Construir la matriz A:
+    A = np.zeros((n, n))
+    for i in range(n):
+        for j in range(i):
+            A[i, j] = -0.5 * (dij[i, j] ** 2)
+            A[j, i] = A[i, j]  # simétrica
+
+    # Doble centrado de Gower (bicenter.wt en R)
+    row_means = np.mean(A, axis=1, keepdims=True)
+    col_means = np.mean(A, axis=0, keepdims=True)
+    grand_mean = np.mean(A)
+    G = A - row_means - col_means + grand_mean
+
+    # Descomposición en valores y vectores propios.
+    # np.linalg.eigh devuelve valores en orden ascendente; los invertimos para obtenerlos en orden descendente.
+    eigvals, eigvecs = np.linalg.eigh(G)
+    eigvals = eigvals[::-1]
+    eigvecs = eigvecs[:, ::-1]
+
+    # Determinar r según R:
+    # En R: w0 <- eig[n] / eig[1]
+    w0 = eigvals[-1] / eigvals[0]
+    if w0 > -tol:
+        r = np.sum(eigvals > (eigvals[0] * tol))
+    else:
+        r = len(eigvals)
+    
+    eigvals_r = eigvals[:r]
+    eigvecs_r = eigvecs[:, :r]
+
+    # Calcular las coordenadas de las especies:
+    # En R: vectors <- vectors[, 1:r] %*% diag(sqrt(abs(eig[1:r])))
+    vectors = eigvecs_r * np.sqrt(np.abs(eigvals_r))[None, :]  # shape (n_especies, r)
+
+    # Determinar qué dimensiones tienen valores propios positivos
+    pos = eigvals_r > 0  # vector booleano de longitud r
+
+    # Calcular FDis para cada sitio (cada fila de la matriz de abundancias a)
+    n_sites = a.shape[0]
+    FDis = np.zeros(n_sites)
+
+    for i in range(n_sites):
+        # Especies presentes en el sitio: índices donde a[i,] > 0
+        pres = np.where(a[i, :] > 0)[0]
+        if pres.size >= 2:
+            # Extraer las coordenadas de las especies presentes
+            vec = vectors[pres, :]
+            # En R se remueven duplicados: nb.sp <- nrow(unique(vec, ...))
+            vec_unique = np.unique(vec, axis=0)
+            if vec_unique.shape[0] >= 2:
+                # Usar los valores de abundancia (no normalizados; weighted.mean en R divide por la suma)
+                w = a[i, pres]
+                # Calcular el centroide ponderado (weighted.mean columna por columna)
+                centroid = np.average(vec, axis=0, weights=w)
+                # Para las dimensiones positivas:
+                if np.any(pos):
+                    diff_pos = vec[:, pos] - centroid[pos]
+                    dist_pos = np.sum(diff_pos**2, axis=1)
+                else:
+                    dist_pos = np.zeros(vec.shape[0])
+                # Para las dimensiones no positivas:
+                if np.any(~pos):
+                    diff_neg = vec[:, ~pos] - centroid[~pos]
+                    dist_neg = np.sum(diff_neg**2, axis=1)
+                else:
+                    dist_neg = np.zeros(vec.shape[0])
+                # Calcular zij según R: sqrt(abs(dist.pos - dist.neg))
+                zij = np.sqrt(np.abs(dist_pos - dist_neg))
+                # FDis es el promedio ponderado de zij
+                FDis[i] = np.average(zij, weights=w)
+            else:
+                FDis[i] = 0
+        else:
+            FDis[i] = 0
+
+    return {"FDis": FDis, "eig": eigvals_r, "vectors": vectors}
+
+
+def alpha_functional_hillr(comm: pd.DataFrame,
+                           traits: skbio.DistanceMatrix,
+                           q: float,
+                           metric: str = "FD_q",
+                           base: float = np.e,
+                           check_data: bool = True,
+                           div_by_sp: bool = False,
+                           fdis_calc: bool = True,
+                           stand_dij: bool = False) -> pd.Series:
+    """
+    Calcula diversidad funcional (números de Hill) para cada sitio (alpha diversidad),
+    replicando la lógica de la función R (hill_func) de Hill‐R.
+    
+    Parámetros:
+      - comm: DataFrame de comunidad con sitios en filas y especies en columnas.
+      - traits: skbio.DistanceMatrix con distancias entre especies (los ids deben coincidir con los nombres de las columnas de comm).
+      - q: Orden de diversidad.
+      - metric: Métrica a calcular. Opciones: "Q", "FDis", "D_q", "MD_q", "FD_q".
+      - base: Base para el logaritmo (usado en q=1).
+      - check_data: (No se implementa verificación exhaustiva aquí).
+      - div_by_sp: Si TRUE, divide ciertos índices por la riqueza de especies.
+      - fdis_calc: Si TRUE y se elige "FDis", calcula la dispersión funcional.
+      - stand_dij: Si TRUE, estandariza la matriz de distancias (máx = 1).
+      
+    Retorna:
+      Una pd.Series con la métrica solicitada para cada sitio, con nombre "qDT q={q}".
+    """
+    # --- 1. Verificar y filtrar especies ---
+    # Se asume que en comm: filas = sitios, columnas = especies.
+    common_species = comm.columns.intersection(traits.ids)
+    if common_species.empty:
+        raise ValueError("Species of community and traits do not match")
+    comm = comm.loc[:, common_species]
+    traits = traits.filter(common_species, strict=False)
+    
+    # --- 2. Extraer y (opcional) estandarizar la matriz de distancias ---
+    dij = traits.data.copy()  # matriz de distancias (numpy array)
+    if stand_dij:
+        dij = dij / np.nanmax(dij)
+    
+    # --- 3. Convertir la comunidad a abundancias relativas ---
+    comm_np = comm.values.astype(float)  # (N sitios, S especies)
+    row_sums = np.sum(comm_np, axis=1, keepdims=True)
+    comm_rel = comm_np / row_sums
+    
+    # --- 4. Calcular especie riqueza (SR) por sitio ---
+    SR = np.sum(comm_np > 0, axis=1)
+    
+    # --- 5. Para q==0, convertir todos los valores positivos a 1 (como en R) ---
+    if q == 0:
+        comm_np[comm_np > 0] = 1
+        row_sums = np.sum(comm_np, axis=1, keepdims=True)
+        comm_rel = comm_np / row_sums
+    
+    # --- 6. Calcular Rao's Q para cada sitio ---
+    N = comm_np.shape[0]
+    Q = np.zeros(N)
+    for k in range(N):
+        Q[k] = np.dot(comm_rel[k, :], np.dot(dij, comm_rel[k, :]))
+    
+    # --- 7. Calcular D_q, MD_q y FD_q ---
+    D_q = np.zeros(N)
+    MD_q = np.zeros(N)
+    FD_q = np.zeros(N)
+    
+    for k in range(N):
+        idx = np.where(comm_rel[k, :] > 0)[0]
+        df2 = comm_rel[k, idx]
+        dis2 = dij[np.ix_(idx, idx)]
+        if Q[k] == 0:
+            D_q[k] = 0
+        else:
+            if q == 0:
+                D_q[k] = (np.sum(dis2 / Q[k]))**0.5
+            elif q == 1:
+                eps = 1e-12
+                outer_prod = np.outer(df2, df2)
+                D_q[k] = np.exp(-0.5 * np.sum((dis2 / Q[k]) * outer_prod * np.log(outer_prod + eps)) / np.log(base))
+            else:
+                din = np.sum((dis2 / Q[k]) * (np.outer(df2, df2)**q))
+                D_q[k] = 0 if din == 0 else din ** (1 / (2 * (1 - q)))
+        MD_q[k] = D_q[k] * Q[k]
+        FD_q[k] = (D_q[k] ** 2) * Q[k]
+    
+    # --- 8. Aplicar división por riqueza si se solicita ---
+    if div_by_sp:
+        choose_val = np.where(SR >= 2, (SR * (SR - 1)) / 2, np.nan)
+        D_q = D_q / SR
+        MD_q = MD_q / SR
+        FD_q = FD_q / choose_val
+    
+    # --- 9. Seleccionar la métrica a retornar ---
+    if metric.upper() == "Q":
+        results = Q
+    elif metric.upper() == "FD_Q":
+        results = FD_q
+    elif metric.upper() == "D_Q":
+        results = D_q
+    elif metric.upper() == "MD_Q":
+        results = MD_q
+    elif metric.upper() == "FDIS":  # Cambio aquí: usar "FDIS" en mayúsculas
+        # Calcular FDis usando la función definida (se usa comm_rel y dij)
+        res_dict = fdisp(traits, comm.values, tol=1e-07)
+        results = res_dict["FDis"]
+    else:
+        raise ValueError("Invalid metric. Choose from: Q, FDis, D_q, MD_q, FD_q")
+    
+    # --- 10. Convertir el resultado a una pd.Series con nombre "qDT q={q}" ---
+    results_series = pd.Series(results, index=comm.index, name=f"qDT q={q}")
+    return results_series
+
+
+def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float, dist: str = "euclidean", 
+                     metric: str = "FD", tau: str or float = "mean") -> pd.Series:
+    
+    # Primero, obtenemos la matriz de distancias a partir de los traits:
+    dm = compute_distance(traits, dist=dist)
+    
+       
+    if metric == "FD":
+        result = alpha_functional_hilldiv2(table, dm, q, tau=tau)
+        result.name = f"FD q={q}"
+    elif metric == "FD_q":
+        result = alpha_functional_hillr(table, dm, q, metric="FD")
+        result.name = f"Q q={q}"  
+    elif metric == "D_q":
+        result = alpha_functional_hillr(table, dm, q, metric="D_q")
+        result.name = f"Q q={q}"      
+    elif metric == "Q":
+        result = alpha_functional_hillr(table, dm, q, metric="Q")
+        result.name = f"Q q={q}"
+    elif metric == "MD_q":
+        result = alpha_functional_hillr(table, dm, q, metric="MD_q")
+        result.name = f"MD_q q={q}"
+    elif metric == "FDis":
+        result  = alpha_functional_hillr(table, dm, q, metric="FDis")
+    else:
+        raise ValueError(f"Metric should be: FD','FD_q','D_q', 'Q', 'MD_q' or 'FDis'")
+    
+    return result
 
