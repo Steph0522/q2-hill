@@ -13,6 +13,7 @@ import skbio
 from skbio import DistanceMatrix
 from skbio.diversity import beta_diversity
 from qiime2 import Metadata
+import qiime2
 
 
 
@@ -264,7 +265,8 @@ def alpha_phylo(table: pd.DataFrame, phylogeny: TreeNode, q: float, metric: str 
 
 def compute_distance(traits: Metadata, dist: str = "euclidean") -> DistanceMatrix:
     
-    traits_df = traits.to_dataframe()
+    #traits_df = traits.to_dataframe()
+    traits_df = traits if isinstance(traits, pd.DataFrame) else traits.to_dataframe()
 
     if dist in ["euclidean", "manhattan"]:
         dist_matrix = beta_diversity(dist, traits_df.values, ids=traits_df.index)
@@ -466,26 +468,10 @@ def alpha_functional_hillr(comm: pd.DataFrame,
                            base: float = np.e,
                            check_data: bool = True,
                            div_by_sp: bool = False,
-                           fdis_calc: bool = True,
+                           fdis_calc: bool = True, 
                            stand_dij: bool = False) -> pd.Series:
-    """
-    Calcula diversidad funcional (números de Hill) para cada sitio (alpha diversidad),
-    replicando la lógica de la función R (hill_func) de Hill‐R.
-    
-    Parámetros:
-      - comm: DataFrame de comunidad con sitios en filas y especies en columnas.
-      - traits: skbio.DistanceMatrix con distancias entre especies (los ids deben coincidir con los nombres de las columnas de comm).
-      - q: Orden de diversidad.
-      - metric: Métrica a calcular. Opciones: "Q", "FDis", "D_q", "MD_q", "FD_q".
-      - base: Base para el logaritmo (usado en q=1).
-      - check_data: (No se implementa verificación exhaustiva aquí).
-      - div_by_sp: Si TRUE, divide ciertos índices por la riqueza de especies.
-      - fdis_calc: Si TRUE y se elige "FDis", calcula la dispersión funcional.
-      - stand_dij: Si TRUE, estandariza la matriz de distancias (máx = 1).
-      
-    Retorna:
-      Una pd.Series con la métrica solicitada para cada sitio, con nombre "qDT q={q}".
-    """
+
+
     # --- 1. Verificar y filtrar especies ---
     # Se asume que en comm: filas = sitios, columnas = especies.
     common_species = comm.columns.intersection(traits.ids)
@@ -567,12 +553,16 @@ def alpha_functional_hillr(comm: pd.DataFrame,
         raise ValueError("Invalid metric. Choose from: Q, FDis, D_q, MD_q, FD_q")
     
     # --- 10. Convertir el resultado a una pd.Series con nombre "qDT q={q}" ---
-    results_series = pd.Series(results, index=comm.index, name=f"qDT q={q}")
+    results_series = pd.Series(results, index=comm.index, name=f"FDis q={q}")
     return results_series
 
 
 def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float, dist: str = "euclidean", 
                      metric: str = "FD", tau: str or float = "mean") -> pd.Series:
+    # Convierte Metadata a DataFrame si es necesario
+    if isinstance(traits, qiime2.Metadata):
+        traits = traits.to_dataframe()
+
     
     # Primero, obtenemos la matriz de distancias a partir de los traits:
     dm = compute_distance(traits, dist=dist)
@@ -582,11 +572,11 @@ def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float, dist: 
         result = alpha_functional_hilldiv2(table, dm, q, tau=tau)
         result.name = f"FD q={q}"
     elif metric == "FD_q":
-        result = alpha_functional_hillr(table, dm, q, metric="FD")
-        result.name = f"Q q={q}"  
+        result = alpha_functional_hillr(table, dm, q, metric="FD_q")
+        result.name = f"FD_q q={q}"  
     elif metric == "D_q":
         result = alpha_functional_hillr(table, dm, q, metric="D_q")
-        result.name = f"Q q={q}"      
+        result.name = f"D_q q={q}"      
     elif metric == "Q":
         result = alpha_functional_hillr(table, dm, q, metric="Q")
         result.name = f"Q q={q}"
@@ -595,6 +585,7 @@ def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float, dist: 
         result.name = f"MD_q q={q}"
     elif metric == "FDis":
         result  = alpha_functional_hillr(table, dm, q, metric="FDis")
+        result.name == f"FDis q=q{q}"
     else:
         raise ValueError(f"Metric should be: FD','FD_q','D_q', 'Q', 'MD_q' or 'FDis'")
     
