@@ -71,7 +71,7 @@ class AlphaTests(TestPluginBase):
             self.functional_table = Artifact.import_data('FeatureTable[Frequency]', func_data)
 
     #test alpha taxa
-     def test_alpha_taxa(self):
+    def test_alpha_taxa(self):
         actual = self.alpha_taxa(table=self.test_table, q=1)[0].view(pd.Series)
         expected = pd.Series({'S1': 1, 'S2': 2, 'S3': 2}, name='q=1')  # Computado manualmente
         pdt.assert_series_equal(actual, expected)
