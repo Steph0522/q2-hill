@@ -29,7 +29,9 @@ class AlphaTests(TestPluginBase):
         # Asignar métodos del plugin
         self.alpha_taxa = self.plugin.methods['alpha_taxa']
         self.alpha_phylo = self.plugin.methods['alpha_phylo']
-        self.alpha_functional = self.plugin.methods.get('alpha_functional', None)
+        self.alpha_functional = self.plugin.methods.get(
+            'alpha_functional', None
+        )
 
         # Importar datos de prueba
         self.empty_table = Artifact.import_data(
@@ -65,7 +67,10 @@ class AlphaTests(TestPluginBase):
     # 📌 **Pruebas para diversidad taxonómica**
     def test_alpha_taxa(self):
         actual = self.alpha_taxa(table=self.test_table, q=1)[0].view(pd.Series)
-        expected = pd.Series({'C1': 1.979626, 'C2': 2.941713}, name='TD q=1')
+        expected = pd.Series(
+            {'C1': 1.979626, 'C2': 2.941713},
+            name='TD q=1'
+        )
         pdt.assert_series_equal(actual, expected)
 
     # 📌 **Pruebas para diversidad filogenética**
@@ -75,7 +80,10 @@ class AlphaTests(TestPluginBase):
             phylogeny=self.test_tree,
             q=1
         )[0].view(pd.Series)
-        expected = pd.Series({'C1': 1.484720, 'C2': 1.641855}, name='PD q=1')
+        expected = pd.Series(
+            {'C1': 1.484720, 'C2': 1.641855},
+            name='PD q=1'
+        )
         pdt.assert_series_equal(actual, expected)
 
     # 📌 **Pruebas para diversidad funcional (si está implementado)**
@@ -87,7 +95,10 @@ class AlphaTests(TestPluginBase):
                 q=1,
                 tau=0.8
             )[0].view(pd.Series)
-            expected = pd.Series({'C1': 1.979626, 'C2': 2.941713}, name='FD q=1')
+            expected = pd.Series(
+                {'C1': 1.979626, 'C2': 2.941713},
+                name='FD q=1'
+            )
             pdt.assert_series_equal(actual, expected)
 
     def test_alpha_functional_empty_table(self):
@@ -102,4 +113,3 @@ class AlphaTests(TestPluginBase):
                     q=1,
                     tau=0.8
                 )
-
