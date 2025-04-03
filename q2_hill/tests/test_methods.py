@@ -32,15 +32,21 @@ class AlphaTests(TestPluginBase):
         self.alpha_functional = self.plugin.methods.get('alpha_functional', None)
 
         # Importar datos de prueba
-        self.empty_table = Artifact.import_data('FeatureTable[Frequency]',
-                                                self.get_data_path('empty.biom'))
+        self.empty_table = Artifact.import_data(
+            'FeatureTable[Frequency]',
+            self.get_data_path('empty.biom')
+        )
 
         # Crear tabla BIOM de prueba
-        biom_table = biom.Table(np.array([[0, 2], [3, 3], [4, 2]]),
-                                ['S1', 'S2', 'S3'],
-                                ['C1', 'C2'])
-
-        self.test_table = Artifact.import_data('FeatureTable[Frequency]', biom_table)
+        biom_table = biom.Table(
+            np.array([[0, 2], [3, 3], [4, 2]]),
+            ['S1', 'S2', 'S3'],
+            ['C1', 'C2']
+        )
+        self.test_table = Artifact.import_data(
+            'FeatureTable[Frequency]',
+            biom_table
+        )
 
         # Crear árbol filogenético de prueba
         tree_data = "((S1:0.25, S2:0.50):0.25, S3:0.75)root;"
@@ -48,9 +54,13 @@ class AlphaTests(TestPluginBase):
         self.test_tree = Artifact.import_data('Phylogeny[Rooted]', tree)
 
         # Crear datos funcionales en formato Metadata
-        self.functional_data = qiime2.Metadata(pd.DataFrame(
-            [[0, 3, 4], [2, 3, 2], [3, 2, 4]], columns=['T1', 'T2', 'T3'],
-            index=pd.Index(['S1', 'S2', 'S3'], name='id')))
+        self.functional_data = qiime2.Metadata(
+            pd.DataFrame(
+                [[0, 3, 4], [2, 3, 2], [3, 2, 4]],
+                columns=['T1', 'T2', 'T3'],
+                index=pd.Index(['S1', 'S2', 'S3'], name='id')
+            )
+        )
 
     # 📌 **Pruebas para diversidad taxonómica**
     def test_alpha_taxa(self):
@@ -60,19 +70,36 @@ class AlphaTests(TestPluginBase):
 
     # 📌 **Pruebas para diversidad filogenética**
     def test_alpha_phylo(self):
-        actual = self.alpha_phylo(table=self.test_table, phylogeny=self.test_tree, q=1)[0].view(pd.Series)
+        actual = self.alpha_phylo(
+            table=self.test_table,
+            phylogeny=self.test_tree,
+            q=1
+        )[0].view(pd.Series)
         expected = pd.Series({'C1': 1.484720, 'C2': 1.641855}, name='PD q=1')
         pdt.assert_series_equal(actual, expected)
 
     # 📌 **Pruebas para diversidad funcional (si está implementado)**
     def test_alpha_functional(self):
         if self.alpha_functional:
-            actual = self.alpha_functional(table=self.test_table, traits=self.functional_data, q=1, tau=0.8)[0].view(pd.Series)
+            actual = self.alpha_functional(
+                table=self.test_table,
+                traits=self.functional_data,
+                q=1,
+                tau=0.8
+            )[0].view(pd.Series)
             expected = pd.Series({'C1': 1.979626, 'C2': 2.941713}, name='FD q=1')
             pdt.assert_series_equal(actual, expected)
 
     def test_alpha_functional_empty_table(self):
         if self.alpha_functional:
-            with self.assertRaisesRegex(ValueError, "Species of table and traits do not match"):
-                self.alpha_functional(table=self.empty_table, traits=self.functional_data, q=1, tau=0.8)
+            with self.assertRaisesRegex(
+                ValueError,
+                "Species of table and traits do not match"
+            ):
+                self.alpha_functional(
+                    table=self.empty_table,
+                    traits=self.functional_data,
+                    q=1,
+                    tau=0.8
+                )
 
