@@ -1,5 +1,4 @@
 import io
-import unittest
 import numpy as np
 import pandas as pd
 import pandas.testing as pdt
@@ -10,7 +9,8 @@ import qiime2
 from qiime2.plugin.testing import TestPluginBase
 from qiime2 import Artifact
 
-from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional
+
+# from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional
 
 
 class TestExamples(TestPluginBase):
@@ -29,7 +29,9 @@ class AlphaTests(TestPluginBase):
         # Asignar métodos del plugin
         self.alpha_taxa = self.plugin.methods["alpha_taxa"]
         self.alpha_phylo = self.plugin.methods["alpha_phylo"]
-        self.alpha_functional = self.plugin.methods.get("alpha_functional", None)
+        self.alpha_functional = self.plugin.methods.get(
+            "alpha_functional", None
+        )
 
         # Importar datos de prueba
         self.empty_table = Artifact.import_data(
@@ -40,7 +42,9 @@ class AlphaTests(TestPluginBase):
         biom_table = biom.Table(
             np.array([[0, 2], [3, 3], [4, 2]]), ["S1", "S2", "S3"], ["C1", "C2"]
         )
-        self.test_table = Artifact.import_data("FeatureTable[Frequency]", biom_table)
+        self.test_table = Artifact.import_data(
+            "FeatureTable[Frequency]", biom_table
+        )
 
         # Crear árbol filogenético de prueba
         tree_data = "((S1:0.25, S2:0.50):0.25, S3:0.75)root;"
@@ -64,9 +68,9 @@ class AlphaTests(TestPluginBase):
 
     # 📌 **Pruebas para diversidad filogenética**
     def test_alpha_phylo(self):
-        actual = self.alpha_phylo(table=self.test_table, phylogeny=self.test_tree, q=1)[
-            0
-        ].view(pd.Series)
+        actual = self.alpha_phylo(
+            table=self.test_table, phylogeny=self.test_tree, q=1
+        )[0].view(pd.Series)
         expected = pd.Series({"C1": 1.484720, "C2": 1.641855}, name="PD q=1")
         pdt.assert_series_equal(actual, expected)
 
@@ -76,7 +80,9 @@ class AlphaTests(TestPluginBase):
             actual = self.alpha_functional(
                 table=self.test_table, traits=self.functional_data, q=1, tau=0.8
             )[0].view(pd.Series)
-            expected = pd.Series({"C1": 1.979626, "C2": 2.941713}, name="FD q=1")
+            expected = pd.Series(
+                {"C1": 1.979626, "C2": 2.941713}, name="FD q=1"
+            )
             pdt.assert_series_equal(actual, expected)
 
     def test_alpha_functional_empty_table(self):
@@ -85,5 +91,8 @@ class AlphaTests(TestPluginBase):
                 ValueError, "Species of table and traits do not match"
             ):
                 self.alpha_functional(
-                    table=self.empty_table, traits=self.functional_data, q=1, tau=0.8
+                    table=self.empty_table,
+                    traits=self.functional_data,
+                    q=1,
+                    tau=0.8,
                 )

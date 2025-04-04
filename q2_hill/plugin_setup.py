@@ -3,7 +3,6 @@ from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
 from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional
-from q2_types.distance_matrix import DistanceMatrix
 
 plugin = Plugin(
     name="hill",
@@ -24,7 +23,9 @@ plugin.methods.register_function(
         "table": "The feature table containing the samples for which hill "
         "numbers should be computed."
     },
-    parameter_descriptions={"q": "Order q of diversity (float between 0 and inf)"},
+    parameter_descriptions={
+        "q": "Order q of diversity (float between 0 and inf)"
+    },
     output_descriptions={
         "alpha_diversity": "Hill numbers calculated for the order indicated"
     },
@@ -50,13 +51,17 @@ plugin.methods.register_function(
     parameter_descriptions={
         "q": "Order of Hill number (q ≥ 0).",
         "metric": (
-            "Metric to calculate: 'PD' for hillR or 'qDT' for hilldiv2. " "Default PD."
+            "Metric to calculate: 'PD' for hillR or 'qDT' for hilldiv2. "
+            "Default PD."
         ),
     },
-    output_descriptions={"alpha_diversity": "Alpha diversity values per sample."},
+    output_descriptions={
+        "alpha_diversity": "Alpha diversity values per sample."
+    },
     name="Phylogenetic Hill Diversity",
     description=(
-        "Computes phylogenetic diversity using Hill numbers with a " "given order q."
+        "Computes phylogenetic diversity using Hill numbers with a "
+        "given order q."
     ),
 )
 
@@ -68,7 +73,8 @@ plugin.methods.register_function(
         "q": Float,
         "dist": Str % Choices(["euclidean", "manhattan", "gower"]),
         "metric": Str % Choices(["FD", "FD_q", "D_q", "Q", "MD_q", "FDis"]),
-        "tau": (Float % Range(0, 1e10)) | (Str % Choices(["min", "max", "mean"])),
+        "tau": (Float % Range(0, 1e10))
+        | (Str % Choices(["min", "max", "mean"])),
     },
     outputs=[("diversity", SampleData[AlphaDiversity])],
     input_descriptions={"table": "Feature table with species abundances."},
@@ -78,7 +84,10 @@ plugin.methods.register_function(
             "trait variables as columns."
         ),
         "q": "Order of Hill number (q ≥ 0).",
-        "dist": ("Distance metric to compute: 'euclidean', 'manhattan' or " "'gower'."),
+        "dist": (
+            "Distance metric to compute: 'euclidean', 'manhattan' or "
+            "'gower'."
+        ),
         "metric": (
             "Metric to calculate: 'FD' for hilldiv2, or 'FD_q', 'D_q', "
             "'Q', 'MD_q' or 'FDis' for hillR."

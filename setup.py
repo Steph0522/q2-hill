@@ -10,9 +10,7 @@ from setuptools import find_packages, setup
 
 import versioneer
 
-description = (
-    "Hill numbers diversity"
-)
+description = "Hill numbers diversity"
 
 setup(
     name="q2-hill",
@@ -25,10 +23,7 @@ setup(
     description=description,
     url="https://steph0522.github.io/website/",
     entry_points={
-        "qiime2.plugins": [
-            "q2_hill="
-            "q2_hill"
-            ".plugin_setup:plugin"]
+        "qiime2.plugins": ["q2_hill=" "q2_hill" ".plugin_setup:plugin"]
     },
     package_data={
         "q2_hill": ["citations.bib"],
