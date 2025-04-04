@@ -1,6 +1,6 @@
 # q2-hill
 
-![](https://github.com/qiime2/q2-hill/workflows/ci-dev/badge.svg)
+![CI](https://github.com/Steph055/q2-hill/actions/workflows/ci.yml/badge.svg)
 
 A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) by Stephanie Hereira-Pacheco (shereirap@gmail.com). 🔌
 
