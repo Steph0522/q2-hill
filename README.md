@@ -4,6 +4,10 @@
 
 A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) by Stephanie Hereira-Pacheco (shereirap@gmail.com). 🔌
 
+## Description
+
+This plugin calculates Hill numbers within QIIME2
+
 ## Installation instructions
 
 **The following instructions are intended to be a starting point** and should be replaced when `q2-hill` is ready to share with others.
