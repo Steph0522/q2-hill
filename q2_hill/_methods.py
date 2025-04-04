@@ -27,10 +27,7 @@ def alpha_taxa(table: pd.DataFrame, q: float) -> pd.Series:
         hill_numbers = (table > 0).sum(axis=1)  # Richness
     elif q == 1:
         hill_numbers = np.exp(
-            -np.nansum(
-                prop * np.log(prop.replace(0, np.nan)),
-                axis=1
-            )
+            -np.nansum(prop * np.log(prop.replace(0, np.nan)), axis=1)
         )  # Shannon
     else:
         hill_numbers = (prop ** q).sum(axis=1) ** (1 / (1 - q))  # General formula
@@ -78,7 +75,9 @@ def tss(abund):
 def tss2(pool_dict):
     total = sum(pool_dict.values())  # Sumar todas las abundancias
     if total != 0:
-        return {key: value / total for key, value in pool_dict.items()}  # Normalizar por la suma total
+        return {
+            key: value / total for key, value in pool_dict.items()
+        }  # Normalizar por la suma total
 
 
 def dat_prep_phylo(comm, phylogeny):
@@ -95,13 +94,14 @@ def dat_prep_phylo(comm, phylogeny):
     for i, node in enumerate(internal_nodes, start=num_tips + 1):
         node.number = i
     # Edges
-    edges = collect_edges(phylogeny)
+    #edges = collect_edges(phylogeny)
     # IDs for tree
     for node in phylogeny.traverse():
         node.id = node.number
     # IDs for edges
-    node_identifiers = [node.id if node.name is None else node.name
-                        for node in phylogeny.traverse()]
+    node_identifiers = [
+        node.id if node.name is None else node.name for node in phylogeny.traverse()
+    ]
     # Rename edges
     for new_name, node in zip(node_identifiers, phylogeny.traverse()):
         node.name = str(new_name)
@@ -111,11 +111,11 @@ def dat_prep_phylo(comm, phylogeny):
     node_names = [node.name for node in phylogeny.traverse()][1:]
     M2 = pd.DataFrame(0, index=comm.columns, columns=node_names)
     tips_names = [tip.name for tip in phylogeny.tips()]
-    for i in range(len(M2.columns) - 1, -1, -1):
-        tips_indices = node_tips[i]
+    for tips in range(len(M2.columns) - 1, -1, -1):
+        tips_indices = node_tips[tips]
         for tip in tips_indices:
             if tip in M2.index:
-                M2.loc[tip, M2.columns[i]] = 1
+                M2.loc[tip, M2.columns[tips]] = 1
     result = np.dot(comm.values, M2.values).T
     result_df = pd.DataFrame(result, index=M2.columns, columns=comm.T.columns)
     return result_df
@@ -137,8 +137,10 @@ def alpha_phylo_hillr(table: pd.DataFrame, phylogeny: TreeNode, q: float) -> pd.
     missing_species = species_in_comm - species_in_tree
     if missing_species:
         # Asegúrate de definir 'show_warning' o utiliza warnings.warn
-        if 'show_warning' in globals() and show_warning:
-            print(f"Warning: Removing {len(missing_species)} species that are not in tree.")
+        if "show_warning" in globals() and show_warning:
+            print(
+                f"Warning: Removing {len(missing_species)} species that are not in tree."
+            )
         comm = comm.drop(columns=missing_species, errors="ignore")
     # Order columns by tree
     tree_leaf_order = [leaf.name for leaf in phylogeny.tips()]
@@ -171,35 +173,44 @@ def alpha_phylo_hillr(table: pd.DataFrame, phylogeny: TreeNode, q: float) -> pd.
         if q == 1:
             PD[sample] = np.exp(
                 -np.sum(
-                    plength[I] * (pabun_sample[I] / TT) *
-                    np.log(pabun_sample[I] / TT)
+                    plength[I] * (pabun_sample[I] / TT) * np.log(pabun_sample[I] / TT)
                 )
             )
         else:
-            PD[sample] = np.sum(
-                plength[I] * (pabun_sample[I] / TT) ** q
-            ) ** (1 / (1 - q))
+            PD[sample] = np.sum(plength[I] * (pabun_sample[I] / TT) ** q) ** (
+                1 / (1 - q)
+            )
     return pd.Series(PD, name=f"PD q={q}")
 
 
-def alpha_phylo_hilldiv2(matrix: pd.DataFrame, phylogeny: TreeNode, q: float) -> pd.Series:
+def alpha_phylo_hilldiv2(
+    matrix: pd.DataFrame, phylogeny: TreeNode, q: float
+) -> pd.Series:
     matrix = matrix.T
     Li = np.array([node.length for node in phylogeny.traverse()][1:])
     ltips = get_node_tips(phylogeny)
     ltips_idx = [[matrix.index.get_loc(name) for name in group] for group in ltips]
     # ai.multi calculation: Apply tss and then 'ai.multi'
-    ai_multi = np.array([
-        [np.sum(tss(matrix.iloc[:, j]).iloc[ltips_idx_i])
-         for ltips_idx_i in ltips_idx]
-        for j in range(matrix.shape[1])
-    ]).T
+    ai_multi = np.array(
+        [
+            [
+                np.sum(tss(matrix.iloc[:, j]).iloc[ltips_idx_i])
+                for ltips_idx_i in ltips_idx
+            ]
+            for j in range(matrix.shape[1])
+        ]
+    ).T
     # DataFrame results
-    ai_multi_df = pd.DataFrame(ai_multi,
-                               columns=matrix.columns,
-                               index=[f"tip_group_{i+1}" for i in range(len(ltips))])
+    ai_multi_df = pd.DataFrame(
+        ai_multi,
+        columns=matrix.columns,
+        index=[f"tip_group_{i+1}" for i in range(len(ltips))],
+    )
     ai = ai_multi_df
     # Loop over each sample
-    pool = pd.DataFrame(matrix).apply(lambda row: 1 if any(row != 0) else 0, axis=1).values
+    pool = (
+        pd.DataFrame(matrix).apply(lambda row: 1 if any(row != 0) else 0, axis=1).values
+    )
     pool_dict = dict(zip(matrix.index, pool))
     # Normalization
     normalized_pool_dict = tss2(pool_dict)
@@ -207,25 +218,31 @@ def alpha_phylo_hilldiv2(matrix: pd.DataFrame, phylogeny: TreeNode, q: float) ->
         for tip in TipVector:
             if tip not in normalized_pool_dict:
                 print(f"Error: '{tip}' is not in normalized_pool_dict")
-    ai_all = [sum(normalized_pool_dict[tip] for tip in TipVector) for TipVector in ltips]
+    ai_all = [
+        sum(normalized_pool_dict[tip] for tip in TipVector) for TipVector in ltips
+    ]
     T = np.sum(Li * ai_all)
     # Calculate Hill values
     results = np.zeros(ai_multi.shape[1])
     for i in range(ai_multi.shape[1]):
         ai = ai_multi[:, i]
         if q == 1:
-            results[i] = np.exp(
-                -np.sum(
-                    Li[ai != 0] * (ai[ai != 0] / T) *
-                    np.log(ai[ai != 0] / T)
+            results[i] = (
+                np.exp(
+                    -np.sum(Li[ai != 0] * (ai[ai != 0] / T) * np.log(ai[ai != 0] / T))
                 )
-            ) / T
+                / T
+            )
         else:
-            results[i] = (np.sum(Li[ai != 0] * (ai[ai != 0] / T) ** q)) ** (1 / (1 - q)) / T
+            results[i] = (np.sum(Li[ai != 0] * (ai[ai != 0] / T) ** q)) ** (
+                1 / (1 - q)
+            ) / T
     return pd.Series(results, index=matrix.columns, name=f"PD q={q}")
 
 
-def alpha_phylo(table: pd.DataFrame, phylogeny: TreeNode, q: float, metric: str = "PD") -> pd.Series:
+def alpha_phylo(
+    table: pd.DataFrame, phylogeny: TreeNode, q: float, metric: str = "PD"
+) -> pd.Series:
     """
     Calculate phylogenetic diversity using hillR (PD) or hillhiv2 (qDT).
     """
@@ -246,6 +263,7 @@ def compute_distance(traits: Metadata, dist: str = "euclidean") -> DistanceMatri
         def gower_distance(data):
             def normalize_column(col):
                 return (col - col.min()) / (col.max() - col.min())
+
             data_normalized = data.copy()
             for col in data.columns:
                 if data[col].dtype != "object":
@@ -258,16 +276,21 @@ def compute_distance(traits: Metadata, dist: str = "euclidean") -> DistanceMatri
                     total_distance = 0
                     for k in range(n_features):
                         if data.iloc[:, k].dtype != "object":
-                            distance = abs(data_normalized.iloc[i, k] - data_normalized.iloc[j, k])
+                            distance = abs(
+                                data_normalized.iloc[i, k] - data_normalized.iloc[j, k]
+                            )
                         else:
                             distance = 0 if data.iloc[i, k] == data.iloc[j, k] else 1
                         total_distance += distance
                     dist_matrix[i, j] = dist_matrix[j, i] = total_distance / n_features
             return dist_matrix
+
         gower_matrix = gower_distance(traits)
         dist_matrix = DistanceMatrix(gower_matrix, ids=traits.index)
     else:
-        raise ValueError("Parameter --p-dist must be 'euclidean', 'manhattan' or 'gower'.")
+        raise ValueError(
+            "Parameter --p-dist must be 'euclidean', 'manhattan' or 'gower'."
+        )
     return dist_matrix
 
 
@@ -289,15 +312,23 @@ def compute_tau(dist_matrix: skbio.DistanceMatrix, tau: str or float = "mean") -
         raise ValueError("Parameter tau must be a number > 0 or 'min', 'max' o 'mean'.")
 
 
-def alpha_functional_hilldiv2(table: pd.DataFrame, traits: skbio.DistanceMatrix,
-                              q_value, tau: str or float = "mean") -> pd.Series:
+def alpha_functional_hilldiv2(
+    table: pd.DataFrame,
+    traits: skbio.DistanceMatrix,
+    q_value,
+    tau: str or float = "mean",
+) -> pd.Series:
     # Check common species between table and distance matrix
     table = table.copy().T
     common_species = table.index.intersection(traits.ids)
     if common_species.empty:
         raise ValueError("Species of table and traits do not match")
     # Determine tau
-    tau = compute_tau(traits, tau) if not (isinstance(tau, (int, float)) and tau > 0) else tau
+    tau = (
+        compute_tau(traits, tau)
+        if not (isinstance(tau, (int, float)) and tau > 0)
+        else tau
+    )
     # Extract distance matrix and limit to tau
     dij = traits.filter(common_species, strict=False).data
     dij = np.where(dij > tau, tau, dij)
@@ -327,7 +358,9 @@ def alpha_functional_hilldiv2(table: pd.DataFrame, traits: skbio.DistanceMatrix,
             entropy = np.sum(-v_filtered * a_filtered * np.log(a_filtered + 1e-10))
             results[sample] = np.exp(entropy)
         else:
-            results[sample] = (np.sum(v_filtered * a_filtered ** q_value)) ** (1 / (1 - q_value))
+            results[sample] = (np.sum(v_filtered * a_filtered ** q_value)) ** (
+                1 / (1 - q_value)
+            )
     results_series = pd.Series(results, name=f"qDT q={q_value}")
     return results_series
 
@@ -391,9 +424,17 @@ def fdisp(dij, a, tol=1e-07):
     return {"FDis": FDis, "eig": eigvals_r, "vectors": vectors}
 
 
-def alpha_functional_hillr(comm: pd.DataFrame, traits: skbio.DistanceMatrix, q: float,
-                           metric: str = "FD_q", base: float = np.e, check_data: bool = True,
-                           div_by_sp: bool = False, fdis_calc: bool = True, stand_dij: bool = False) -> pd.Series:
+def alpha_functional_hillr(
+    comm: pd.DataFrame,
+    traits: skbio.DistanceMatrix,
+    q: float,
+    metric: str = "FD_q",
+    base: float = np.e,
+    check_data: bool = True,
+    div_by_sp: bool = False,
+    fdis_calc: bool = True,
+    stand_dij: bool = False,
+) -> pd.Series:
     # --- 1. Verificar y filtrar especies ---
     common_species = comm.columns.intersection(traits.ids)
     if common_species.empty:
@@ -437,7 +478,9 @@ def alpha_functional_hillr(comm: pd.DataFrame, traits: skbio.DistanceMatrix, q: 
                 eps = 1e-12
                 outer_prod = np.outer(df2, df2)
                 D_q[k] = np.exp(
-                    -0.5 * np.sum((dis2 / Q[k]) * outer_prod * np.log(outer_prod + eps)) / np.log(base)
+                    -0.5
+                    * np.sum((dis2 / Q[k]) * outer_prod * np.log(outer_prod + eps))
+                    / np.log(base)
                 )
             else:
                 din = np.sum((dis2 / Q[k]) * (np.outer(df2, df2) ** q))
@@ -469,8 +512,14 @@ def alpha_functional_hillr(comm: pd.DataFrame, traits: skbio.DistanceMatrix, q: 
     return results_series
 
 
-def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float,
-                     dist: str = "euclidean", metric: str = "FD", tau: str or float = "mean") -> pd.Series:
+def alpha_functional(
+    table: pd.DataFrame,
+    traits: pd.DataFrame,
+    q: float,
+    dist: str = "euclidean",
+    metric: str = "FD",
+    tau: str or float = "mean",
+) -> pd.Series:
     # Convierte Metadata a DataFrame si es necesario
     if isinstance(traits, qiime2.Metadata):
         traits = traits.to_dataframe()
@@ -497,4 +546,3 @@ def alpha_functional(table: pd.DataFrame, traits: pd.DataFrame, q: float,
     else:
         raise ValueError(f"Metric should be: FD, FD_q, D_q, Q, MD_q or FDis")
     return result
-
