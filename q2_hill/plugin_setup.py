@@ -2,7 +2,8 @@ from qiime2.plugin import Plugin, Str, Choices, Float, Range, Metadata
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
-from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional
+from q2_types.distance_matrix import DistanceMatrix
+from q2_hill._methods import alpha_taxa, alpha_phylo, alpha_functional, hillpair_taxa
 
 plugin = Plugin(
     name="hill",
@@ -103,4 +104,23 @@ plugin.methods.register_function(
         "Computes functional diversity (Hill numbers) using a feature "
         "table and traits metadata."
     ),
+)
+
+plugin.methods.register_function(
+    function=hillpair_taxa,
+    inputs={"data": FeatureTable[Frequency]},
+    parameters={"q": Float, "metric": Str % Choices(["C", "S", "V", "U"])} ,
+    outputs=[("distance_matrix", DistanceMatrix)],
+    name="hillpair_taxa",
+    description="Calculate pairwise Hill Taxonomic diversity dissimilarities between samples",
+    input_descriptions={
+        "data": "Feature table containing species counts."
+    },
+    parameter_descriptions={
+        "q": "Order of Hill number (q ≥ 0).",
+        "metric": "Metric to calculate: 'C, 'S, 'V' or 'U'."
+    },
+    output_descriptions={
+        "distance_matrix": "Pairwise distance matrix based on Hill numbers."
+    },
 )

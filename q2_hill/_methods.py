@@ -13,6 +13,7 @@ import skbio
 from skbio import DistanceMatrix
 from skbio.diversity import beta_diversity
 from qiime2 import Metadata
+import itertools
 import qiime2
 
 
@@ -593,3 +594,135 @@ def alpha_functional(
     else:
         raise ValueError("Metric should be: FD, FD_q, D_q, Q, MD_q or FDis")
     return result
+ 
+def hilldiss_S(beta, N):
+    return 1 - (((1 / beta) - (1 / N)) / (1 - (1 / N)))
+
+def hilldiss_C(beta, N, q):
+    if q == 1:
+        q_adj = 0.999999
+    else:
+        q_adj = q
+    return 1 - (((1 / beta) ** (q_adj - 1) - (1 / N) ** (q_adj - 1)) / (1 - (1 / N) ** (q_adj - 1)))
+
+def hilldiss_V(beta, N):
+    return 1 - ((N - beta) / (N - 1))
+
+def hilldiss_U(beta, N, q):
+    if q == 1:
+        q_adj = 0.999999
+    else:
+        q_adj = q
+    return 1 - (((1 / beta) ** (1 - q_adj) - (1 / N) ** (1 - q_adj)) / (1 - (1 / N) ** (1 - q_adj)))
+
+def hillpart_taxa(comm: pd.DataFrame, q: float):
+    if isinstance(q, (int, float)):
+        q = [q]  
+
+    if not isinstance(q, list):
+        raise ValueError("The parameter q must be numeric")
+    comm = comm.T
+    data = comm.loc[(comm != 0).any(axis=1)]  
+
+    pi = data.div(data.sum(axis=0), axis=1)  
+
+    results = []
+
+    for q_value in q:
+        if q_value == 0:
+            species_per_sample = (pi > 0).sum(axis=0)
+            alpha = species_per_sample.mean()
+            gamma = (pi.sum(axis=1) > 0).sum()
+
+        elif q_value == 1:
+            pi_nonzero = pi[pi != 0]
+            alpha = np.exp(- (pi_nonzero * np.log(pi_nonzero)).sum(axis=0).mean())
+
+            gamma_vec = pi.mean(axis=1)
+            gamma = np.exp(-np.sum(gamma_vec[gamma_vec != 0] * np.log(gamma_vec[gamma_vec != 0])))
+
+        else:
+            alpha_vals = (pi ** q_value).sum(axis=0)
+            alpha = (alpha_vals.mean()) ** (1 / (1 - q_value))
+
+            gamma_vec = pi.mean(axis=1)
+            gamma = (gamma_vec ** q_value).sum() ** (1 / (1 - q_value))
+
+        beta = gamma / alpha
+        results.append([alpha, gamma, beta])
+
+    result_df = pd.DataFrame(results, columns=["alpha", "gamma", "beta"],
+                             index=[f"q{q_value}" for q_value in q])
+
+    return result_df
+
+def hilldiss_taxa(comm: pd.DataFrame, q: float, metric: str = "C"):
+    if not isinstance(q, (int, float)):
+        raise ValueError("q parameter must be numeric (int or float).")
+    
+    # Asignamos primero la variable data, basándonos en el DataFrame de entrada
+    data = comm.T
+    N = data.shape[1]
+    
+    # Si q es una lista, tomamos solo el primer valor (aunque se espera q sea float)
+    if isinstance(q, list):
+        q = q[0]
+    
+    df_hill = hillpart_taxa(data, q)  # Calcula alfa, gamma y beta
+    betas = df_hill["beta"].values
+
+    diss = []
+    
+    beta = betas[0]
+    
+    if metric == "S":
+        diss.append(hilldiss_S(beta, N))
+    elif metric == "C":
+        diss.append(hilldiss_C(beta, N, q))
+    elif metric == "V":
+        diss.append(hilldiss_V(beta, N))
+    elif metric == "U":
+        diss.append(hilldiss_U(beta, N, q))
+    else:
+        raise ValueError(f"Invalid metric: {metric}. Valid options: 'C', 'U', 'V', 'S'.")
+    
+    return pd.DataFrame({
+       f"{metric}qN": diss
+    })
+
+def hillpair_taxa(data: pd.DataFrame, q: float, metric: str = "C") -> DistanceMatrix:
+    if not isinstance(data, pd.DataFrame):
+        raise ValueError("Input data must be a FeatureTable")
+    data = data.T
+    sample_names = data.columns.tolist()
+    pairs = list(itertools.combinations(sample_names, 2))
+
+    results = []
+    for s1, s2 in pairs:
+        sub_data = data[[s1, s2]]
+        diss = hilldiss_taxa(sub_data, q=q, metric=metric)  # Pasamos q como valor numérico
+        diss["site1"] = s1
+        diss["site2"] = s2
+        diss["q"] = q  # Agregar el valor de q
+        results.append(diss)
+
+    df = pd.concat(results, ignore_index=True)
+
+    metric_col = f"{metric}qN"  # Ejemplo: 'CqN'
+    if metric_col not in df.columns:
+        raise ValueError(f"Invalid metric: '{metric_col}'")
+
+    df_results = df[["q", "site1", "site2", metric_col]].rename(columns={metric_col: f"{metric}qN"})
+
+    # Crear la matriz de distancia en formato DataFrame
+    dist_matrix = pd.DataFrame(index=sample_names, columns=sample_names, dtype=float)
+    for _, row in df_results.iterrows():
+        dist_matrix.loc[row["site1"], row["site2"]] = row[f"{metric}qN"]
+        dist_matrix.loc[row["site2"], row["site1"]] = row[f"{metric}qN"]
+        dist_matrix.loc[row["site1"], row["site1"]] = 0
+        dist_matrix.loc[row["site2"], row["site2"]] = 0
+
+    # Convertir el DataFrame a un objeto DistanceMatrix de skbio
+    dm = DistanceMatrix(dist_matrix.values, ids=dist_matrix.index.tolist())
+    return dm
+
