@@ -621,7 +621,6 @@ def hillpart_taxa(comm: pd.DataFrame, q: float):
 
     if not isinstance(q, list):
         raise ValueError("The parameter q must be numeric")
-    comm = comm.T
     data = comm.loc[(comm != 0).any(axis=1)]  
 
     pi = data.div(data.sum(axis=0), axis=1)  
@@ -661,7 +660,7 @@ def hilldiss_taxa(comm: pd.DataFrame, q: float, metric: str = "C"):
         raise ValueError("q parameter must be numeric (int or float).")
     
     # Asignamos primero la variable data, basándonos en el DataFrame de entrada
-    data = comm.T
+    data = comm
     N = data.shape[1]
     
     # Si q es una lista, tomamos solo el primer valor (aunque se espera q sea float)

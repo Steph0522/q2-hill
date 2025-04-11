@@ -1,0 +1,11 @@
+#SampleID	Group
+com1	A
+com2	B
+com3	A
+com4	B
+com5	A	
+com6	B	
+com7	A
+com8	B
+com9	A
+com10	B
