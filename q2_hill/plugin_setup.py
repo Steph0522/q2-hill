@@ -1,5 +1,5 @@
 from qiime2.plugin import Plugin, Str, Choices, Float, Range, Metadata
-from q2_types.feature_table import FeatureTable, Frequency
+from q2_types.feature_table import FeatureTable, Frequency, RelativeFrequency, PresenceAbsence
 from q2_types.tree import Phylogeny, Rooted
 from q2_types.sample_data import SampleData, AlphaDiversity
 from q2_types.distance_matrix import DistanceMatrix
@@ -15,32 +15,33 @@ plugin = Plugin(
     version="0.0.1",
     website="https://github.com/tu-repositorio",
     package="q2_hill",
-    description="Calculate Hill numbers from a Feature Table with Frequencies",
+    description="Compute Hill numbers of different types - taxonomic, phylogenetic, and functional - for alpha and beta diversity metrics at different orders of q",
 )
 
 plugin.methods.register_function(
     function=alpha_taxa,
-    inputs={"table": FeatureTable[Frequency]},
+    inputs={'table':
+            FeatureTable[Frequency | RelativeFrequency | PresenceAbsence]},
     parameters={"q": Float},
     outputs=[("alpha_diversity", SampleData[AlphaDiversity])],
     name="alpha_taxa",
-    description="Calculate Hill numbers for a q value (order)",
+    description="Calculate Hill taxonomic numbers for a q value (order)",
     input_descriptions={
-        "table": "The feature table containing the samples for which hill "
+        "table": "The feature table containing the samples for which Hill "
         "numbers should be computed."
     },
     parameter_descriptions={
         "q": "Order q of diversity (float between 0 and inf)"
     },
     output_descriptions={
-        "alpha_diversity": "Hill numbers calculated for the order indicated"
+        "alpha_diversity": "Taxonomic Hill numbers calculated for the order indicated"
     },
 )
 
 plugin.methods.register_function(
     function=alpha_phylo,
-    inputs={
-        "table": FeatureTable[Frequency],
+    inputs={'table':
+            FeatureTable[Frequency | RelativeFrequency | PresenceAbsence],
         "phylogeny": Phylogeny[Rooted],
     },
     parameters={
@@ -49,20 +50,21 @@ plugin.methods.register_function(
     },
     outputs=[("alpha_diversity", SampleData[AlphaDiversity])],
     input_descriptions={
-        "table": "Feature table with species abundances.",
+        "table": "The feature table containing the samples for which Hill "
+        "numbers should be computed.",
         "phylogeny": (
-            "Rooted phylogenetic tree corresponding to species in the " "table."
+            "Rooted phylogenetic tree corresponding to species in the table."
         ),
     },
     parameter_descriptions={
-        "q": "Order of Hill number (q ≥ 0).",
+        "q": "Order q of diversity (float between 0 and inf)",
         "metric": (
-            "Metric to calculate: 'PD' for hillR or 'qDT' for hilldiv2. "
+            "Metric to calculate: 'PD' as hillR (effective total branch length) or 'qDT' as hilldiv2 (effective number of lineages). "
             "Default PD."
         ),
     },
     output_descriptions={
-        "alpha_diversity": "Alpha diversity values per sample."
+        "alpha_diversity": "Phylogenetic Hill numbers calculated for the order indicated."
     },
     name="Phylogenetic Hill Diversity",
     description=(
@@ -83,7 +85,8 @@ plugin.methods.register_function(
         | (Str % Choices(["min", "max", "mean"])),
     },
     outputs=[("diversity", SampleData[AlphaDiversity])],
-    input_descriptions={"table": "Feature table with species abundances."},
+    input_descriptions={"table": "The feature table containing the samples for which Hill "
+        "numbers should be computed."},
     parameter_descriptions={
         "traits": (
             "Metadata containing trait data with species as rows and "
@@ -110,23 +113,19 @@ plugin.methods.register_function(
         "table and traits metadata."
     ),
 )
-
 plugin.methods.register_function(
     function=beta_taxa,
-    inputs={"data": FeatureTable[Frequency]},
+    inputs={"table": FeatureTable[Frequency | RelativeFrequency | PresenceAbsence]},  # ✅
     parameters={"q": Float, "metric": Str % Choices(["C", "S", "V", "U"])},
     outputs=[("distance_matrix", DistanceMatrix)],
-    input_descriptions={"data": "Feature table containing species counts."},
+    input_descriptions={"table": "The feature table containing the samples..."},  # ✅ Corregido
     parameter_descriptions={
-        "q": "Order of Hill number (q ≥ 0).",
+        "q": "Order of diversity (float between 0 and inf).",
         "metric": "Metric to calculate: 'C', 'S', 'V' or 'U'.",
     },
     output_descriptions={
-        "distance_matrix": "Pairwise distance matrix based on Hill numbers."
+        "distance_matrix": "Pairwise distance matrix based on Hill numbers..."
     },
     name="hillpair_taxa",
-    description=(
-        "Calculate pairwise Hill Taxonomic diversity dissimilarities "
-        "between samples."
-    )
+    description="Calculate pairwise Hill Taxonomic diversity dissimilarities..."
 )
