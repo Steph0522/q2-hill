@@ -1,3 +1,4 @@
+import qiime2.plugin
 from qiime2.plugin import Plugin, Str, Choices, Float, Range, Metadata
 from q2_types.feature_table import FeatureTable, Frequency, RelativeFrequency, PresenceAbsence
 from q2_types.tree import Phylogeny, Rooted
@@ -115,17 +116,20 @@ plugin.methods.register_function(
 )
 plugin.methods.register_function(
     function=beta_taxa,
-    inputs={"table": FeatureTable[Frequency | RelativeFrequency | PresenceAbsence]},  # ✅
-    parameters={"q": Float, "metric": Str % Choices(["C", "S", "V", "U"])},
+    inputs={"table": FeatureTable[Frequency | RelativeFrequency | PresenceAbsence]},
+    parameters={"q": Float,
+                "metric": Str % Choices(["C", "S", "V", "U"]),
+                "similarity": qiime2.plugin.Bool},
     outputs=[("distance_matrix", DistanceMatrix)],
-    input_descriptions={"table": "The feature table containing the samples..."},  # ✅ Corregido
+    input_descriptions={"table": "The feature table containing the samples for which Hill "
+        "numbers should be computed. "},
     parameter_descriptions={
         "q": "Order of diversity (float between 0 and inf).",
-        "metric": "Metric to calculate: 'C', 'S', 'V' or 'U'.",
+        "metric": "Metric to calculate: 'C':Sørensen-type overlap-complement, 'S':Jaccard-type turnover, 'V':Sørensen-type turnover or 'U':Jaccard-type overlap-complement.",
     },
     output_descriptions={
-        "distance_matrix": "Pairwise distance matrix based on Hill numbers..."
+        "distance_matrix": "Pairwise distance matrix based on Hill numbers for the metric chosen"
     },
     name="hillpair_taxa",
-    description="Calculate pairwise Hill Taxonomic diversity dissimilarities..."
+    description="Computes overall dissimilarity metrics based on the Hill taxonomic numbers beta diversity following Chiu et al. (2014).  "
 )

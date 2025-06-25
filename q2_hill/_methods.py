@@ -16,7 +16,11 @@ from qiime2 import Metadata
 import qiime2
 import itertools
 
-# functions for taxonomic alpha diversity
+
+
+################# ALPHA DIVERSITY
+
+########### functions for taxonomic alpha diversity
 
 
 def alpha_taxa(table: pd.DataFrame, q: float) -> pd.Series:
@@ -36,7 +40,7 @@ def alpha_taxa(table: pd.DataFrame, q: float) -> pd.Series:
     # Return as Series
     return pd.Series(hill_numbers, index=table.index, name=f"TD q={q}")
 
-# functions for phylogenetic alpha diversity
+########### functions for phylogenetic alpha diversity
 
 
 def get_descendants(node, tips=False):
@@ -234,7 +238,7 @@ def alpha_phylo(
     else:
         raise ValueError("Invalid metric. Use 'PD' or 'qDT'.")
 
-# functions for functional alpha diversity
+########## functions for functional alpha diversity
 
 
 def compute_distance(
@@ -535,7 +539,10 @@ def alpha_functional(
         raise ValueError("Metric should be: FD, FD_q, D_q, Q, MD_q or FDis")
     return result
 
-# functions for taxonomic beta diversity
+
+################### BETA DIVERSITY
+
+########### functions for taxonomic beta diversity
 
 
 def hilldiss_S(beta, N):
@@ -620,8 +627,7 @@ def hillpart_taxa(comm: pd.DataFrame, q: float):
 
     return result_df
 
-
-def hilldiss_taxa(comm: pd.DataFrame, q: float, metric: str = "C"):
+def hilldiss_taxa(comm: pd.DataFrame, q: float, metric: str = "C", similarity: bool = False):
     if not isinstance(q, (int, float)):
         raise ValueError("q parameter must be numeric (int or float).")
 
@@ -632,41 +638,38 @@ def hilldiss_taxa(comm: pd.DataFrame, q: float, metric: str = "C"):
         q = q[0]
 
     df_hill = hillpart_taxa(data, q)
-    betas = df_hill["beta"].values
-    diss = []
-    beta = betas[0]
+    beta = df_hill["beta"].values[0]
 
     if metric == "S":
-        diss.append(hilldiss_S(beta, N))
+        diss = hilldiss_S(beta, N)
     elif metric == "C":
-        diss.append(hilldiss_C(beta, N, q))
+        diss = hilldiss_C(beta, N, q)
     elif metric == "V":
-        diss.append(hilldiss_V(beta, N))
+        diss = hilldiss_V(beta, N)
     elif metric == "U":
-        diss.append(hilldiss_U(beta, N, q))
+        diss = hilldiss_U(beta, N, q)
     else:
-        raise ValueError(
-            f"Invalid metric: {metric}. "
-            "Valid options: 'C', 'U', 'V', 'S'."
-        )
+        raise ValueError(f"Invalid metric: {metric}. Valid options: 'C', 'U', 'V', 'S'.")
 
-    return pd.DataFrame({f"{metric}qN": diss})
+    if similarity:
+        diss = 1 - diss
 
+    return pd.DataFrame({f"{metric}qN": [diss]})
 
 def beta_taxa(
-    data: pd.DataFrame, q: float, metric: str = "C"
+    table: pd.DataFrame, q: float, metric: str = "C", similarity: bool = False
 ) -> DistanceMatrix:
-    if not isinstance(data, pd.DataFrame):
-        raise ValueError("Input data must be a FeatureTable")
+    if not isinstance(table, pd.DataFrame):
+        raise ValueError("Input table must be a FeatureTable")
 
-    data = data.T
-    sample_names = data.columns.tolist()
+    table = table.T
+    sample_names = table.columns.tolist()
     pairs = list(itertools.combinations(sample_names, 2))
 
     results = []
     for s1, s2 in pairs:
-        sub_data = data[[s1, s2]]
-        diss = hilldiss_taxa(sub_data, q=q, metric=metric)
+        sub_table = table[[s1, s2]]
+        diss = hilldiss_taxa(sub_table, q=q, metric=metric, similarity=similarity)
         diss["site1"] = s1
         diss["site2"] = s2
         diss["q"] = q
@@ -678,19 +681,20 @@ def beta_taxa(
     if metric_col not in df.columns:
         raise ValueError(f"Invalid metric: '{metric_col}'")
 
-    df_results = df[["q", "site1", "site2", metric_col]].rename(
-        columns={metric_col: f"{metric}qN"}
-    )
+    df_results = df[["q", "site1", "site2", metric_col]]
 
-    dist_matrix = pd.DataFrame(
-        index=sample_names, columns=sample_names, dtype=float
-    )
+    dist_matrix = pd.DataFrame(index=sample_names, columns=sample_names, dtype=float)
 
     for _, row in df_results.iterrows():
-        dist_matrix.loc[row["site1"], row["site2"]] = row[f"{metric}qN"]
-        dist_matrix.loc[row["site2"], row["site1"]] = row[f"{metric}qN"]
-        dist_matrix.loc[row["site1"], row["site1"]] = 0
-        dist_matrix.loc[row["site2"], row["site2"]] = 0
+        value = row[metric_col]
+        dist_matrix.loc[row["site1"], row["site2"]] = value
+        dist_matrix.loc[row["site2"], row["site1"]] = value
+        dist_matrix.loc[row["site1"], row["site1"]] = 1 if similarity else 0
+        dist_matrix.loc[row["site2"], row["site2"]] = 1 if similarity else 0
 
     dm = DistanceMatrix(dist_matrix.values, ids=dist_matrix.index.tolist())
     return dm
+
+
+
+
